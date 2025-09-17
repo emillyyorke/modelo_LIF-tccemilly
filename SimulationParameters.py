@@ -1,45 +1,73 @@
 # SimulationParameters.py
-# Parâmetros globais do modelo LIF + STDP (Brian2) — runtime puro
+from brian2 import *
 
-from brian2 import second, ms, mV
+# ===========================
+# Tempo de simulação
+# ===========================
+SIM_TIME = 10*second
+DT       = 0.1*ms
 
-# --------- Rede / Simulação ---------
-N_NEURONS = 100
-SIM_TIME = 10 * second
-DT = 0.1 * ms                 # passo de integração
-RANDOM_SEED = 42              # reprodutibilidade
+# ===========================
+# Tamanho da rede
+# ===========================
+N = 250                   # todos excitatórios
+P_CONNECT = 1.0           # completamente conectada
+AUTAPSES = False          # sem autoconexões
 
-# --------- Neurônio LIF ---------
-TAU_M = 10 * ms               # constante de tempo de membrana
-E_L = -70 * mV                # potencial de fuga (repouso)
-V_THR = -50 * mV              # limiar de disparo
-V_RESET = -60 * mV            # potencial de reset
-REFRAC = 2 * ms               # período refratário absoluto
-TAU_E = 5 * ms                # decaimento da condutância excitatória
-E_EXC = 0 * mV                # reversão excitatória (AMPA)
+# ===========================
+# LIF + condutâncias (Tabak-style names)
+# ===========================
+Cm      = 200*pF          # Capacitância
+gL      = 10*nS           # Condutância de vazamento  -> tau_m = Cm/gL = 20 ms
+EL      = -70*mV          # Potencial de repouso
+V_th    = -50*mV          # limiar
+V_reset = -60*mV          # reset
+T_ref   = 2*ms            # período refratário
 
-# --------- Corrente externa (será setada explícita no iappInit) ---------
-# (mantidas aqui apenas as unidades)
-I_EXT_MIN = -2 * mV
-I_EXT_MAX = 30 * mV
+# Sinapse excitatória
+gbar_syn = 0.08*nS        # ganho base multiplicado por w (→ ajuste p/ Tabak 2010)
+V_syn    = 0*mV           # reversal da sinapse excitatória
+tau_e    = 5*ms           # decaimento da condutância excitatória (beta_a^-1 aproximadamente)
 
-# --------- STDP ---------
-TAU_PRE = 20 * ms
-TAU_POST = 20 * ms
+# Adaptação (canal K/hiperpolarizante)
+gbar_theta = 0.5*nS       # ganho da adaptação (incremento por spike)
+V_theta    = -80*mV       # reversal da adaptação
+tau_a      = 200*ms       # constante de decaimento (aprox. 1/beta_theta)
 
-# Limites e escala de peso
+# ===========================
+# Corrente externa (iapp)
+# ===========================
+I_mean = 200*pA           # média próxima do limiar
+I_std  = 50*pA            # desvio para heterogeneidade
+
+# ===========================
+# STDP (Bi & Poo, aditivo)
+# ===========================
+STDP_ENABLED = False       # <--- comute aqui
+
+# Janelas temporais
+tau_pre  = 20*ms
+tau_post = 20*ms
+
+# Magnitudes (aqui mantenho LTD ligeiramente mais forte p/ evitar saturação)
+A_LTP = 0.010             # Δw por pós-antes
+A_LTD = -0.012            # Δw por antes-pós
+eta   = 1.0               # fator global
+
+# Limites e inicialização
 W_MIN = 0.0
 W_MAX = 2.0
+W_INIT_FIXED = 1.0        # sem STDP
+W_INIT_MIN   = 0.5        # com STDP: uniforme [0.5, 1.5]
+W_INIT_MAX   = 1.5
 
-# Amplitudes base (ajuste fino fica a seu critério)
-D_A_PRE  = 0.01 * W_MAX       # LTP
-D_A_POST = -(0.01 * W_MAX) * (TAU_PRE/TAU_POST) * 1.05  # LTD com leve viés
+# ===========================
+# Monitoramento
+# ===========================
+N_W_SAMPLES = 64          # amostra de sinapses p/ monitorar pesos
+W_MON_DT    = 50*ms       # passo de gravação do peso
 
-# "additive" (Bi & Poo) ou "weight_dep" (Van Rossum)
-STDP_MODE = "additive"
-
-# --------- Ligar/Desligar STDP ---------
-USE_STDP = False               # mude para False para rodar sem STDP
-W_INIT_STATIC = 1.0           # << pedido: sem STDP peso inicial = 1.0
-
-
+# ===========================
+# Atraso sináptico
+# ===========================
+DELAY = 1.5*ms
