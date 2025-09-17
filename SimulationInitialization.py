@@ -1,88 +1,87 @@
 # SimulationInitialization.py
-# Sinapses excitatórias all-to-all (sem autapses) com/sem STDP
-
+from brian2 import *
 import numpy as np
-from brian2 import Synapses, clip, ms
-from SimulationParameters import (
-    TAU_PRE, TAU_POST, W_MAX, W_MIN, D_A_PRE, D_A_POST,
-    STDP_MODE, USE_STDP, W_INIT_STATIC, N_NEURONS
-)
+from SimulationParameters import *
+from iappInit import make_iapp
 
-def all2all_no_autapse_indices(N):
-    I_grid, J_grid = np.meshgrid(np.arange(N), np.arange(N), indexing='ij')
-    mask = (I_grid != J_grid)
-    I = I_grid[mask].astype(int).ravel()
-    J = J_grid[mask].astype(int).ravel()
-    return I, J
+def make_neurons():
+    defaultclock.dt = DT
 
-# Converte tempos e pesos para números puros (num*unidade nas strings)
-from brian2 import ms
-TAU_PRE_ms  = float(TAU_PRE/ms)
-TAU_POST_ms = float(TAU_POST/ms)
-W_MAX_f     = float(W_MAX)
-W_MIN_f     = float(W_MIN)
-D_A_PRE_f   = float(D_A_PRE)
-D_A_POST_f  = float(D_A_POST)
+    eqs = '''
+    dv/dt = ( -gL*(v-EL) - ge*(v - V_syn) - ga*(v - V_theta) + I_app )/Cm : volt (unless refractory)
+    dge/dt = -ge/tau_e : siemens
+    dga/dt = -ga/tau_a : siemens
+    I_app : amp
+    '''
 
-synapse_model = f'''
-w : 1
-dApre/dt  = -Apre / ({TAU_PRE_ms}*ms) : 1 (event-driven)
-dApost/dt = -Apost / ({TAU_POST_ms}*ms) : 1 (event-driven)
-'''
-
-# Bi & Poo (aditivo) — com clamp [W_MIN, W_MAX]
-on_pre_additive  = f'''
-g_e_post += w
-Apre += {D_A_PRE_f}
-w = clip(w + Apost, {W_MIN_f}, {W_MAX_f})
-'''
-on_post_additive = f'''
-Apost += {D_A_POST_f}
-w = clip(w + Apre, {W_MIN_f}, {W_MAX_f})
-'''
-
-# Van Rossum (LTD multiplicativa) — com clamp [W_MIN, W_MAX]
-on_pre_weightdep  = f'''
-g_e_post += w
-Apre += {D_A_PRE_f}
-w = clip(w + (Apost * w / {W_MAX_f}), {W_MIN_f}, {W_MAX_f})
-'''
-on_post_weightdep = f'''
-Apost += {D_A_POST_f}
-w = clip(w + Apre, {W_MIN_f}, {W_MAX_f})
-'''
-
-def make_excitatory_synapses(neurons):
-    I, J = all2all_no_autapse_indices(N_NEURONS)
-
-    if not USE_STDP:
-        # --- versão ESTÁTICA (sem STDP): peso inicial = 1.0 ---
-        syn = Synapses(
-            neurons, neurons,
-            model='w:1',
-            on_pre='g_e_post += w',
-            method='euler'
-        )
-        syn.connect(i=I, j=J)
-        syn.w = W_INIT_STATIC  # pedido: 1.0
-        return syn
-
-    # --- versão COM STDP ---
-    if STDP_MODE == "additive":
-        on_pre, on_post = on_pre_additive, on_post_additive
-    else:
-        on_pre, on_post = on_pre_weightdep, on_post_weightdep
-
-    syn = Synapses(
-        neurons, neurons,
-        model=synapse_model,
-        on_pre=on_pre,
-        on_post=on_post,
-        method='euler',
-        namespace={'clip': clip}
+    G = NeuronGroup(
+        N, eqs, threshold='v>V_th', reset='v=V_reset; ga += gbar_theta',
+        refractory=T_ref, method='euler', name='neurongroup'
     )
-    syn.connect(i=I, j=J)
 
-    # Pedido: pesos iniciais ~ Uniform(0.5, 1.5), clamp automático garantido nas regras
-    syn.w = np.random.uniform(0.5, 1.5, size=len(I))
-    return syn
+    # Estados iniciais
+    G.v = EL + (V_th-EL)*0.2    # 20% do caminho ao limiar
+    G.ge = 0*nS
+    G.ga = 0*nS
+    G.I_app = make_iapp()
+
+    return G
+
+def make_synapses(G):
+    if STDP_ENABLED:
+        S = Synapses(
+            G, G,
+            model='''
+            w : 1
+            dapre/dt  = -apre/tau_pre : 1 (event-driven)
+            dapost/dt = -apost/tau_post : 1 (event-driven)
+            ''',
+            on_pre='''
+            ge_post += w * gbar_syn
+            apre += A_LTP
+            w = clip(w + eta*apost, W_MIN, W_MAX)
+            ''',
+            on_post='''
+            apost += A_LTD
+            w = clip(w + eta*apre, W_MIN, W_MAX)
+            ''',
+            method='euler',
+            name='synapses_stdp'
+        )
+    else:
+        # Sem STDP: sinapse mínima, apenas transmite
+        S = Synapses(
+            G, G,
+            model='w:1',
+            on_pre='ge_post += w * gbar_syn',
+            method='euler',
+            name='synapses_static'
+        )
+
+    # Conexões: completo sem autapses
+    if AUTAPSES:
+        S.connect(p=P_CONNECT)
+    else:
+        S.connect(condition='i!=j', p=P_CONNECT)
+
+    S.delay = DELAY
+
+    # Pesos iniciais
+    if STDP_ENABLED:
+        np.random.seed(7)
+        S.w = np.random.uniform(W_INIT_MIN, W_INIT_MAX, size=S.N)
+    else:
+        S.w = W_INIT_FIXED
+
+    return S
+
+def make_monitors(G, S):
+    spk = SpikeMonitor(G, name='spikemon')
+    rate = PopulationRateMonitor(G, name='ratemon')
+
+    # Amostra de pesos
+    nrec = min(N_W_SAMPLES, S.N)
+    idx = np.random.RandomState(123).choice(S.N, size=nrec, replace=False)
+    wmon = StateMonitor(S, 'w', record=idx, dt=W_MON_DT, name='wmon') if STDP_ENABLED else None
+
+    return spk, rate, wmon
