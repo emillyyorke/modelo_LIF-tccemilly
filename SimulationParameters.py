@@ -43,15 +43,15 @@ I_std  = 50*pA            # desvio para heterogeneidade
 # ===========================
 # STDP (Bi & Poo, aditivo)
 # ===========================
-STDP_ENABLED = False       # <--- comute aqui
+STDP_ENABLED = True      # <--- comute aqui
 
 # Janelas temporais
 tau_pre  = 20*ms
 tau_post = 20*ms
 
 # Magnitudes (aqui mantenho LTD ligeiramente mais forte p/ evitar saturação)
-A_LTP = 0.010             # Δw por pós-antes
-A_LTD = -0.012            # Δw por antes-pós
+A_LTP = 0.04          # Δw por pós-antes
+A_LTD = -0.02        # Δw por antes-pós
 eta   = 1.0               # fator global
 
 # Limites e inicialização
@@ -71,3 +71,7 @@ W_MON_DT    = 50*ms       # passo de gravação do peso
 # Atraso sináptico
 # ===========================
 DELAY = 1.5*ms
+
+# ===== Snapshots de pesos p/ histograma (export_for_plot.py) =====
+SAVE_WEIGHTS_HISTORY = True   # ligue/desligue facilmente
+SNAPSHOT_DT_MS       = 200.0  # salva a cada 0,2 s (200 ms)
