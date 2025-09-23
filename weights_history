@@ -1,0 +1,73 @@
+# weights_history.py — captura snapshots de pesos e salva w_all.npz
+# Uso:
+#   import weights_history as wh
+#   wh.init(results_dir="./results", snapshot_dt_ms=200.0, enabled=True)
+#   wh.capture(t_ms, W_ou_w, mask=None)   # chame no loop após atualizar os pesos
+#   wh.finalize()                         # chame ao final da simulação
+
+from __future__ import annotations
+import os
+import numpy as np
+from typing import Optional
+
+_enabled: bool = False
+_results_dir: str = "./results"
+_snapshot_dt_ms: float = 200.0
+_next_save_ms: float = 200.0
+_snap_t_ms: list[float] = []
+_snap_W: list[np.ndarray] = []
+
+def init(results_dir: str = "./results", snapshot_dt_ms: float = 200.0, enabled: bool = True) -> None:
+    global _enabled, _results_dir, _snapshot_dt_ms, _next_save_ms, _snap_t_ms, _snap_W
+    _enabled = bool(enabled)
+    _results_dir = results_dir
+    _snapshot_dt_ms = float(snapshot_dt_ms)
+    _next_save_ms = float(snapshot_dt_ms)
+    _snap_t_ms = []
+    _snap_W = []
+    if _enabled:
+        os.makedirs(_results_dir, exist_ok=True)
+
+def _flatten_weights(weights: np.ndarray, mask: Optional[np.ndarray]) -> np.ndarray:
+    """Aceita W (2D NxN) ou w (1D). Se mask for booleana NxN, aplica antes de achatar."""
+    if not isinstance(weights, np.ndarray):
+        raise TypeError("weights deve ser np.ndarray")
+    if mask is not None:
+        if not isinstance(mask, np.ndarray):
+            raise TypeError("mask deve ser np.ndarray booleana NxN")
+        flat = weights[mask].astype(np.float32).ravel()
+    else:
+        flat = weights.astype(np.float32).ravel()
+    return flat.copy()
+
+def capture(t_ms: float, weights: np.ndarray, mask: Optional[np.ndarray] = None) -> None:
+    """Chamar dentro do loop após atualizar os pesos (STDP, etc.)."""
+    global _next_save_ms
+    if not _enabled:
+        return
+    if float(t_ms) < _next_save_ms:
+        return
+    try:
+        _snap_t_ms.append(float(t_ms))
+        _snap_W.append(_flatten_weights(weights, mask))
+        _next_save_ms += _snapshot_dt_ms
+    except Exception as e:
+        # não interrompe a simulação por erro de snapshot
+        print(f"[weights_history][warn] snapshot ignorado: {e}")
+
+def finalize() -> None:
+    """Salvar w_all.npz no diretório configurado (com compressão)."""
+    if not _enabled:
+        print("[weights_history][info] desabilitado; nada a salvar.")
+        return
+    if len(_snap_W) == 0:
+        print("[weights_history][info] nenhum snapshot coletado.")
+        return
+    try:
+        W_stack = np.vstack(_snap_W)              # (n_snapshots, n_pesos)
+        t_arr = np.asarray(_snap_t_ms, dtype=np.float32)  # (n_snapshots,)
+        out_npz = os.path.join(_results_dir, "w_all.npz")
+        np.savez_compressed(out_npz, t=t_arr, W=W_stack)
+        print(f"[weights_history][ok] w_all.npz salvo: {out_npz} | snapshots={W_stack.shape[0]} | pesos={W_stack.shape[1]}")
+    except Exception as e:
+        print(f"[weights_history][warn] falha ao salvar w_all.npz: {e}")
