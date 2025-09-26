@@ -1,6 +1,4 @@
-# plotRaster.py — estilo “classic_fig1” (replica visual da 1ª imagem) + salva PNG
-# Se existir BASE_w_hist_200ms.npz no root, também plota e salva o heatmap de pesos vs tempo.
-
+# plotRaster.py 
 import matplotlib.pyplot as plt
 import numpy as np
 import importlib
@@ -93,11 +91,8 @@ dt = np.mean(np.diff(t))
 # =========================
 def find_peaks_simple(y, prominence=0.05, min_dist_ms=200):
     y = np.asarray(y, dtype=float)
-    # zero-crossing de derivada + limiar
     dy = np.diff(y)
-    # candidato: de + para - (máximo local)
     cand = np.where((dy[:-1] > 0) & (dy[1:] <= 0))[0] + 1
-    # filtra por proeminência mínima (fracionária do [0,1])
     if len(cand) == 0:
         return np.array([], dtype=int)
     ymin, ymax = np.min(y), np.max(y)
@@ -105,7 +100,6 @@ def find_peaks_simple(y, prominence=0.05, min_dist_ms=200):
     good = cand[y[cand] >= (ymin + prominence * span)]
     if len(good) <= 1:
         return good
-    # aplica distância mínima entre picos
     min_dist = max(1, int(min_dist_ms / dt))
     keep = [int(good[0])]
     last = good[0]
@@ -115,7 +109,7 @@ def find_peaks_simple(y, prominence=0.05, min_dist_ms=200):
             last = idx
     return np.asarray(keep, dtype=int)
 
-peak_idx = find_peaks_simple(A, prominence=0.10, min_dist_ms=400)  # ajuste fino se quiser
+peak_idx = find_peaks_simple(A, prominence=0.10, min_dist_ms=400)
 peak_t_ms = t[peak_idx] if peak_idx.size else np.array([])
 
 # =========================
@@ -139,7 +133,6 @@ from matplotlib import gridspec
 fig = plt.figure(figsize=(12, 6), constrained_layout=True)
 gs = fig.add_gridspec(2, 2, width_ratios=[3, 1], height_ratios=[1, 1])
 
-# suptitle: caminho/base curto (como na 1ª imagem)
 fig.suptitle(os.path.join(root, spike_module_name), y=0.98, fontsize=9)
 
 # 1) raster (top-left)
@@ -150,14 +143,13 @@ for n in range(nNeurons):
         ax0.scatter(st, np.full_like(st, n), s=3, marker='.', c='red', alpha=0.9, linewidths=0)
 ax0.set_xlim([0, tT])
 ax0.set_ylabel("Neuron")
-ax0.invert_yaxis()  # 0 no topo (igual sua 1ª figura)
+ax0.invert_yaxis()
 ax0.grid(alpha=0.2, linestyle=":")
 ax0.tick_params('x', labelbottom=False)
 
 # 2) ISI hist (top-right)
 ax1 = fig.add_subplot(gs[0, 1])
 if allisi.size:
-    # bins ~ Freedman–Diaconis com limites 0-100
     iqr = np.subtract(*np.percentile(allisi, [75, 25]))
     binw = 2 * iqr * (allisi.size ** (-1/3)) if iqr > 0 else None
     nb = int(np.clip((np.ptp(allisi) / binw) if binw else np.sqrt(allisi.size), 10, 40))
@@ -170,7 +162,6 @@ ax1.grid(alpha=0.2, linestyle=":")
 # 3) atividade + linhas verticais (bottom-left)
 ax2 = fig.add_subplot(gs[1, 0])
 ax2.plot(t/1000.0, A, lw=1.2, color='black', label='Activity')
-# linhas tracejadas nos picos (como a imagem 1 sugere)
 for tt in peak_t_ms:
     ax2.axvline(tt/1000.0, color='gray', lw=0.8, ls='--', alpha=0.6)
 ax2.set_xlim([0, tT/1000.0])
@@ -209,28 +200,3 @@ except Exception as e:
     print(f"[warn] Não foi possível salvar a figura: {e}")
 
 plt.show()
-
-# ======= (Opcional) Heatmap da distribuição de pesos ao longo do tempo =======
-hist_npz = os.path.join(root, f"{base}_w_hist_200ms.npz")
-if os.path.exists(hist_npz):
-    z = np.load(hist_npz)
-    counts = z["counts"]; w_edges = z["w_edges"]; t_edges_s = z["t_edges_s"]
-    fig2 = plt.figure(figsize=(12, 4), constrained_layout=True)
-    axh = fig2.add_subplot(1,1,1)
-    im = axh.imshow(
-        counts, origin="lower", aspect="auto",
-        extent=[t_edges_s[0], t_edges_s[-1], w_edges[0], w_edges[-1]]
-    )
-    axh.set_xlabel("Time (s)")
-    axh.set_ylabel("Weight")
-    axh.set_title("Weight distribution over time (hist every 0.2 s)")
-    cbar = plt.colorbar(im, ax=axh); cbar.set_label("Frequency")
-    out_png2 = os.path.join(root, f"{base}_weights_hist_200ms.png")
-    try:
-        fig2.savefig(out_png2, bbox_inches="tight")
-        print(f"[ok] Heatmap pesos salvo em: {out_png2}")
-    except Exception as e:
-        print(f"[warn] Não foi possível salvar heatmap: {e}")
-    plt.show()
-else:
-    print("[info] Cache de hist de pesos não encontrado. Rode o exporter com w_all.npz presente.")
