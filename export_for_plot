@@ -1,17 +1,7 @@
-# export_for_plot.py — gera BASE_Spikes.py, BASE_np.txt, quicklook
-# e histogramas de pesos por janela de tempo (0,2 s) em PDF/PNGs.
-# Lê W_MIN/W_MAX de SimulationParameters.py (quando --wmin/--wmax não forem passados).
-
-import os, argparse, textwrap, math
+# export_for_plot.py — gera BASE_Spikes.py e BASE_np.txt
+import os, argparse, textwrap
 import numpy as np
 from datetime import datetime
-
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-
-import importlib.util
 
 INVALID = '<>:"/\\|?*,'
 
@@ -81,186 +71,17 @@ def save_np_txt(t_ms, rate_hz, w_t=None, w_mean=None, out_txt_path=None):
     M = np.column_stack([t_ms, rate_hz, A_norm, S_norm])
     np.savetxt(out_txt_path, M, fmt="%.6f", delimiter="\t")
 
-# ------------------------------ parâmetros de pesos ------------------------------
-def _try_import_module_from(root_dir: str, filename: str):
-    path = os.path.join(root_dir, filename)
-    if not os.path.exists(path):
-        return None
-    try:
-        spec = importlib.util.spec_from_file_location("simparams", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)  # type: ignore
-        return mod
-    except Exception:
-        return None
-
-def read_weight_limits_from_params(root_dir: str):
-    mod = _try_import_module_from(root_dir, "SimulationParameters.py")
-    if mod is None:
-        return (None, None)
-    wmin = getattr(mod, "W_MIN", None)
-    wmax = getattr(mod, "W_MAX", None)
-    try:
-        if wmin is not None: wmin = float(wmin)
-        if wmax is not None: wmax = float(wmax)
-    except Exception:
-        wmin, wmax = None, None
-    return (wmin, wmax)
-
-# ------------------------------ quicklook ------------------------------
-def save_quicklook_png(root, base, spike_i, spike_t, t_ms, A_norm):
-    fig = plt.figure(figsize=(10, 4), constrained_layout=True)
-    gs = fig.add_gridspec(1, 2, width_ratios=[2, 1])
-    ax0 = fig.add_subplot(gs[0, 0])
-    try:
-        ax0.scatter(spike_t, spike_i, s=1.5, marker='.', c='red', alpha=0.8, linewidths=0)
-    except Exception:
-        pass
-    ax0.set_title("Raster (quicklook)")
-    if t_ms.size: ax0.set_xlim([0, float(t_ms[-1])])
-    ax0.set_ylabel("Neuron"); ax0.set_xlabel("Time (ms)")
-    ax0.invert_yaxis(); ax0.grid(alpha=0.2, linestyle=":")
-    ax1 = fig.add_subplot(gs[0, 1])
-    if t_ms.size and A_norm.size:
-        ax1.plot(t_ms/1000.0, A_norm, lw=1.0, color='black')
-        ax1.set_xlim([0, float(t_ms[-1])/1000.0])
-    ax1.set_title("Activity (norm)")
-    ax1.set_xlabel("Time (s)"); ax1.set_ylabel("A_norm"); ax1.grid(alpha=0.2, linestyle=":")
-    out_png = os.path.join(root, f"{base}_quicklook.png")
-    fig.savefig(out_png, bbox_inches="tight"); plt.close(fig)
-    print(f"[ok] Quicklook salvo: {out_png}")
-
-# ------------------------------ hist de pesos: janela por janela ------------------------------
-def bin_time_series(t_ms, W, time_bin_ms):
-    """
-    Retorna uma lista de (t0, t1, Wseg) para cada janela.
-      t_ms: (T,) em ms
-      W:    (T, Nw) pesos por snapshot
-    """
-    t_ms = np.asarray(t_ms, dtype=float).ravel()
-    W = np.asarray(W, dtype=float)
-    assert W.ndim == 2 and W.shape[0] == t_ms.size, "W deve ter shape (T, Nw) casando com t_ms"
-
-    t_min, t_max = float(np.nanmin(t_ms)), float(np.nanmax(t_ms))
-    nb_t = max(1, int(np.ceil((t_max - t_min) / time_bin_ms)))
-    t_edges = np.linspace(t_min, t_min + nb_t*time_bin_ms, nb_t + 1)
-    windows = []
-    for k in range(nb_t):
-        t0, t1 = t_edges[k], t_edges[k+1]
-        mask = (t_ms >= t0) & (t_ms < t1)
-        if not np.any(mask):
-            windows.append((t0, t1, None))
-        else:
-            Wseg = W[mask, :].reshape(-1)
-            Wseg = Wseg[np.isfinite(Wseg)]
-            windows.append((t0, t1, Wseg))
-    return windows  # lista de nb_t itens
-
-def save_weight_histograms_per_window(root, base, windows, wmin=None, wmax=None,
-                                      w_bins=50, ncols=5, nrows=4):
-    """
-    Cria um PDF e PNGs por página, com histogramas por janela.
-    Cada página tem nrows*ncols janelas (ex.: 4x5 = 20).
-    """
-    # limites
-    if wmin is None or wmax is None:
-        all_vals = np.concatenate([w for (_,_,w) in windows if w is not None]) if any(w is not None for _,_,w in windows) else np.array([])
-        if all_vals.size:
-            p1, p99 = np.percentile(all_vals, [1, 99])
-            if wmin is None: wmin = float(p1)
-            if wmax is None: wmax = float(p99)
-            if wmax <= wmin:
-                wmin, wmax = float(np.min(all_vals)), float(np.max(all_vals))
-        else:
-            wmin, wmax = 0.0, 1.0
-    w_edges = np.linspace(wmin, wmax, int(w_bins)+1)
-
-    per_page = ncols * nrows
-    pages = int(math.ceil(len(windows) / per_page))
-
-    pdf_path = os.path.join(root, f"{base}_weights_hist_by_200ms.pdf")
-    pdf = PdfPages(pdf_path)
-
-    for p in range(pages):
-        fig, axes = plt.subplots(nrows, ncols, figsize=(17, 10))
-        axes = axes.ravel()
-        for idx in range(per_page):
-            ax = axes[idx]
-            k = p*per_page + idx
-            if k >= len(windows):
-                ax.axis("off")
-                continue
-            t0, t1, Wseg = windows[k]
-            if Wseg is None or Wseg.size == 0:
-                ax.text(0.5, 0.5, "sem dados", ha="center", va="center", transform=ax.transAxes)
-                ax.set_title(f"{t0/1000.0:.2f}–{t1/1000.0:.2f} s")
-                ax.set_xlim(wmin, wmax)
-                continue
-            counts, _ = np.histogram(Wseg, bins=w_edges)
-            centers = 0.5*(w_edges[:-1] + w_edges[1:])
-            width = (w_edges[1]-w_edges[0])*0.95
-            ax.bar(centers, counts, width=width, edgecolor="black", alpha=0.85)
-            ax.set_xlim(wmin, wmax)
-            ax.set_title(f"{t0/1000.0:.2f}–{t1/1000.0:.2f} s")
-            ax.grid(alpha=0.2, linestyle=":")
-        fig.suptitle("Weight histograms per 0.2 s window", y=0.995)
-        fig.tight_layout(rect=[0, 0, 1, 0.97])
-        pdf.savefig(fig, bbox_inches="tight")
-        # também salva PNG por página
-        out_png = os.path.join(root, f"{base}_weights_hist_by_200ms_page{p+1:03d}.png")
-        fig.savefig(out_png, bbox_inches="tight")
-        plt.close(fig)
-
-    pdf.close()
-    print(f"[ok] PDF de histogramas salvo: {pdf_path}")
-    print(f"[ok] PNGs por página salvos como: {base}_weights_hist_by_200ms_pageXXX.png")
-
-# ------------------------------ HEATMAP (opcional) ------------------------------
-def save_weights_heatmap(root, base, windows, wmin, wmax, w_bins=50):
-    # monta matriz counts (bins x tempo) a partir das janelas
-    w_edges = np.linspace(wmin, wmax, int(w_bins)+1)
-    counts_list = []
-    for (_,_,Wseg) in windows:
-        if Wseg is None or Wseg.size == 0:
-            counts_list.append(np.zeros(len(w_edges)-1, dtype=int))
-        else:
-            c, _ = np.histogram(Wseg, bins=w_edges)
-            counts_list.append(c)
-    counts = np.stack(counts_list, axis=1)  # (bins, nb_t)
-
-    fig = plt.figure(figsize=(12, 4), constrained_layout=True)
-    ax = fig.add_subplot(1,1,1)
-    im = ax.imshow(counts, origin="lower", aspect="auto",
-                   extent=[0, len(windows)*0.2, w_edges[0], w_edges[-1]])
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Weight")
-    ax.set_title("Weight distribution over time (hist every 0.2 s)")
-    cbar = plt.colorbar(im, ax=ax); cbar.set_label("Frequency")
-    out_png = os.path.join(root, f"{base}_weights_heatmap_200ms.png")
-    fig.savefig(out_png, bbox_inches="tight"); plt.close(fig)
-    print(f"[ok] Heatmap (opcional) salvo: {out_png}")
-
 # ------------------------------ main ------------------------------
 def main():
     ap = argparse.ArgumentParser(
-        description="Exporta arquivos p/ plot e cria histogramas de pesos por janela (0,2 s).",
+        description="Exporta arquivos de dados para o script de plot.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    ap.add_argument("--root", default="./results/", help="Pasta dos .npy/.npz e saídas")
+    ap.add_argument("--root", default="./results/", help="Pasta dos .npy e saídas")
     ap.add_argument("--base", default="LIF", help="Prefixo do experimento")
     ap.add_argument("--n", type=int, default=None, help="Força n_neurons (opcional)")
     ap.add_argument("--append-ts", dest="append_ts", action="store_true", help="Anexa timestamp ao base")
     ap.add_argument("--ts-format", default="%Y-%m-%d_%H%M%S", help="Formato do timestamp")
-    # janelas e bins
-    ap.add_argument("--time-bin", type=float, default=0.2, help="largura da janela (s) para os histogramas")
-    ap.add_argument("--wmin", type=float, default=None, help="limite inferior pesos (sobrepõe params)")
-    ap.add_argument("--wmax", type=float, default=None, help="limite superior pesos (sobrepõe params)")
-    ap.add_argument("--w-bins", type=int, default=50, help="nº de bins do histograma de pesos")
-    # layout do PDF
-    ap.add_argument("--ncols", type=int, default=5, help="nº de colunas por página do PDF")
-    ap.add_argument("--nrows", type=int, default=4, help="nº de linhas por página do PDF")
-    # opcional: ainda salvar heatmap
-    ap.add_argument("--save-heatmap", action="store_true", help="salvar também o heatmap (opcional)")
     args = ap.parse_args()
 
     root = args.root
@@ -270,18 +91,15 @@ def main():
     if args.append_ts:
         base = f"{base}_{datetime.now().strftime(args.ts_format)}"
 
-    # entradas obrigatórias para raster/quicklook
+    # Entradas obrigatórias
     p_spike_i = os.path.join(root, "spike_i.npy")
     p_spike_t = os.path.join(root, "spike_t.npy")
     p_rate_t  = os.path.join(root, "rate_t.npy")
     p_rate_hz = os.path.join(root, "rate_hz.npy")
 
-    # opcionais médias (só p/ S_norm no np.txt)
+    # Opcionais (só p/ S_norm no np.txt)
     p_w_t     = os.path.join(root, "w_t.npy")
     p_w_mean  = os.path.join(root, "w_mean.npy")
-
-    # distribuição completa (necessário para histogramas por janela)
-    p_w_all   = os.path.join(root, "w_all.npz")
 
     # ----- gerar spikes.py e np.txt -----
     spike_i = load_npy_must(p_spike_i)
@@ -299,54 +117,6 @@ def main():
     out_np_txt = os.path.join(root, f"{base}_np.txt")
     save_np_txt(rate_t, rate_hz, w_t=w_t, w_mean=w_mean, out_txt_path=out_np_txt)
     print(f"[ok] Gerado: {out_np_txt}  (amostras: {len(rate_t)})")
-
-    A_norm = _norm01(rate_hz)
-    save_quicklook_png(root, base, spike_i, spike_t, rate_t, A_norm)
-
-    # ----- histogramas por janela -----
-    if not os.path.exists(p_w_all):
-        print("[info] w_all.npz não encontrado; não há como montar histogramas por janela.")
-        return
-
-    z = np.load(p_w_all)
-    t_keys = [k for k in z.files if k.lower().startswith("t")]
-    w_keys = [k for k in z.files if k.lower().startswith("w")]
-    t_key = "t" if "t" in z.files else (t_keys[0] if t_keys else None)
-    w_key = "W" if "W" in z.files else (w_keys[0] if w_keys else None)
-    if t_key is None or w_key is None:
-        print("[warn] w_all.npz sem chaves esperadas (t, W).")
-        return
-
-    t_all = z[t_key]          # (T,)
-    W_all = z[w_key]          # (T, Nw)
-    time_bin_ms = float(args.time_bin*1000.0)
-
-    # limites de peso: CLI > SimulationParameters.py > auto p1..p99
-    wmin_cli, wmax_cli = args.wmin, args.wmax
-    wmin_params, wmax_params = read_weight_limits_from_params(root)
-    wmin_eff = wmin_cli if (wmin_cli is not None) else wmin_params
-    wmax_eff = wmax_cli if (wmax_cli is not None) else wmax_params
-    if wmin_eff is None or wmax_eff is None:
-        finite = W_all[np.isfinite(W_all)]
-        if finite.size:
-            p1, p99 = np.percentile(finite, [1, 99])
-            if wmin_eff is None: wmin_eff = float(p1)
-            if wmax_eff is None: wmax_eff = float(p99)
-        else:
-            wmin_eff, wmax_eff = 0.0, 1.0
-
-    # agrupar por janela e salvar PDF/PNGs
-    windows = bin_time_series(t_all, W_all, time_bin_ms=time_bin_ms)
-    save_weight_histograms_per_window(
-        root, base, windows,
-        wmin=wmin_eff, wmax=wmax_eff,
-        w_bins=int(args.w_bins),
-        ncols=int(args.ncols), nrows=int(args.nrows)
-    )
-
-    # opcional: também salvar heatmap (se quiser ter as duas visões)
-    if args.save_heatmap:
-        save_weights_heatmap(root, base, windows, wmin=wmin_eff, wmax=wmax_eff, w_bins=int(args.w_bins))
 
 if __name__ == "__main__":
     main()
