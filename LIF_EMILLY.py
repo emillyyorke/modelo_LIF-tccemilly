@@ -17,6 +17,12 @@ def main():
     results_dir = "./results"
     os.makedirs(results_dir, exist_ok=True)
 
+    # Salvar parâmetros da simulação
+    with open(os.path.join(results_dir, "params.txt"), "w") as f:
+        f.write(f"STDP_ENABLED = {STDP_ENABLED}\n")
+        f.write(f"A_LTP = {A_LTP}\n")
+        f.write(f"A_LTD = {A_LTD}\n")
+
     # Construção da rede
     G = make_neurons()
     S = make_synapses(G)
