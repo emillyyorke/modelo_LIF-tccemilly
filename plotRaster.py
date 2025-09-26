@@ -48,6 +48,38 @@ def apply_style(preset):
 apply_style(PRESET)
 
 # =========================
+# Ler parâmetros e criar strings
+# =========================
+def get_params(root_dir):
+    params = {}
+    params_path = os.path.join(root_dir, "params.txt")
+    if os.path.exists(params_path):
+        with open(params_path, "r") as f:
+            for line in f:
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    params[key.strip()] = value.strip()
+    return params
+
+params = get_params(root)
+stdp_info = ""
+filename_suffix = ""
+
+if "STDP_ENABLED" in params:
+    if params["STDP_ENABLED"] == "True":
+        ltp = params.get("A_LTP", "NA")
+        ltd = params.get("A_LTD", "NA")
+        stdp_info = f"STDP: ON | LTP = {ltp} | LTD = {ltd}"
+        
+        # Criar sufixo para nome de arquivo (seguro para nomes de arquivo)
+        ltp_fn = ltp.replace('.', 'p').replace('-', 'm')
+        ltd_fn = ltd.replace('.', 'p').replace('-', 'm')
+        filename_suffix = f"_stdp_on_ltp{ltp_fn}_ltd{ltd_fn}"
+    else:
+        stdp_info = "STDP: OFF"
+        filename_suffix = "_stdp_off"
+
+# =========================
 # localizar arquivos
 # =========================
 assert os.path.isdir(root), f"Diretório não existe: {root}"
@@ -130,10 +162,13 @@ if allisi.size:
 # figure (layout da 1ª imagem)
 # =========================
 from matplotlib import gridspec
-fig = plt.figure(figsize=(12, 6), constrained_layout=True)
+# Aumentei a altura da figura para dar mais espaço ao título
+fig = plt.figure(figsize=(12, 6.5), constrained_layout=True)
 gs = fig.add_gridspec(2, 2, width_ratios=[3, 1], height_ratios=[1, 1])
 
-fig.suptitle(os.path.join(root, spike_module_name), y=0.98, fontsize=9)
+# Constrói o título com a informação do STDP e ajusta a posição
+title = f"{os.path.join(root, spike_module_name)}\n{stdp_info}"
+fig.suptitle(title, y=1.02, fontsize=9) # Mudei o 'y' para subir o título
 
 # 1) raster (top-left)
 ax0 = fig.add_subplot(gs[0, 0])
@@ -192,7 +227,8 @@ ax3.xaxis.set_major_locator(MaxNLocator(nbins=4, integer=True, prune='upper'))
 ax3.xaxis.set_major_formatter(FuncFormatter(human_int))
 
 # ===== salvar figura principal =====
-out_png = os.path.join(root, f"{base}_classic_fig1.png")
+# Adiciona o sufixo com info de STDP ao nome do arquivo
+out_png = os.path.join(root, f"{base}{filename_suffix}_classic_fig1.png")
 try:
     fig.savefig(out_png, bbox_inches="tight")
     print(f"[ok] Figura salva em: {out_png}")
