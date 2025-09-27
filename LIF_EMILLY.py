@@ -10,16 +10,14 @@ from SimulationInitialization import (
 )
 
 def main():
-    # NOVO: Captura o tempo de início da simulação
+    # Captura o tempo de início da simulação
     start_time = time.time()
 
-    # Garantir runtime puro (nada de C++)
+    # Garantir runtime puro
     prefs.codegen.target = 'numpy'
     start_scope()
-
-    # =================================================================
+    
     # Geração de nome de pasta para a simulação
-    # =================================================================
     base_results_dir = "./results"
     timestamp = int(time.time())
     
