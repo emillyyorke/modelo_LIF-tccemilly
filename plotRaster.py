@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import importlib
 import sys, os, glob
+import argparse # Adicionado
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 
 # =========================
@@ -10,12 +11,10 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 # =========================
 tT   = 10000.0
 dt   = 0.01
-root = "./results/"
-base = ""                 # deixe "" para auto-inferir do *_Spikes.py
-thA, thDA = 0.35, 0.14    # (não usados neste layout, mas mantidos)
+# As variáveis 'root' e 'base' foram removidas daqui para serem definidas pelos argumentos
 
 # === preset visual desejado (1ª figura) ===
-PRESET = "classic_fig1"   # mude para "paper" se quiser voltar ao anterior
+PRESET = "classic_fig1"
 
 def apply_style(preset):
     if preset == "classic_fig1":
@@ -46,6 +45,15 @@ def apply_style(preset):
         })
 
 apply_style(PRESET)
+
+# =========================
+# Argumentos de Linha de Comando (NOVA SEÇÃO)
+# =========================
+parser = argparse.ArgumentParser(description="Gera raster plot a partir de uma pasta de simulação.")
+parser.add_argument("--dir", required=True, help="O caminho para a pasta de resultados da simulação específica.")
+args = parser.parse_args()
+root = args.dir # 'root' agora é definido pelo argumento --dir
+base = ""        # Mantemos para auto-inferir o nome dos arquivos
 
 # =========================
 # Ler parâmetros e criar strings
@@ -84,8 +92,9 @@ if "STDP_ENABLED" in params:
 # =========================
 assert os.path.isdir(root), f"Diretório não existe: {root}"
 if base == "":
+    # A busca agora é feita dentro do diretório especificado em 'root'
     candidates = sorted(glob.glob(os.path.join(root, "*_Spikes*.py")), key=os.path.getmtime)
-    assert len(candidates) > 0, "Nenhum *_Spikes*.py em ./results/"
+    assert len(candidates) > 0, f"Nenhum arquivo *_Spikes*.py encontrado em '{root}'"
     spike_module_path = candidates[-1]
     spike_module_name = os.path.basename(spike_module_path)[:-3]
     if spike_module_name.endswith("_Spikes_pN-1"):
@@ -108,7 +117,7 @@ dc = np.loadtxt(np_path, delimiter="\t")
 if dc.ndim == 1:
     dc = dc.reshape(-1, 4)
 # colunas: t_ms, rate_hz, A_norm, S_norm
-t = dc[:, 0].astype(float)     # ms
+t = dc[:, 0].astype(float)
 rate_hz = dc[:, 1].astype(float)
 A = dc[:, 2].astype(float)
 S = dc[:, 3].astype(float)
@@ -162,13 +171,11 @@ if allisi.size:
 # figure (layout da 1ª imagem)
 # =========================
 from matplotlib import gridspec
-# Aumentei a altura da figura para dar mais espaço ao título
 fig = plt.figure(figsize=(12, 6.5), constrained_layout=True)
 gs = fig.add_gridspec(2, 2, width_ratios=[3, 1], height_ratios=[1, 1])
 
-# Constrói o título com a informação do STDP e ajusta a posição
 title = f"{os.path.join(root, spike_module_name)}\n{stdp_info}"
-fig.suptitle(title, y=1.02, fontsize=9) # Mudei o 'y' para subir o título
+fig.suptitle(title, y=1.02, fontsize=9)
 
 # 1) raster (top-left)
 ax0 = fig.add_subplot(gs[0, 0])
@@ -227,7 +234,6 @@ ax3.xaxis.set_major_locator(MaxNLocator(nbins=4, integer=True, prune='upper'))
 ax3.xaxis.set_major_formatter(FuncFormatter(human_int))
 
 # ===== salvar figura principal =====
-# Adiciona o sufixo com info de STDP ao nome do arquivo
 out_png = os.path.join(root, f"{base}{filename_suffix}_classic_fig1.png")
 try:
     fig.savefig(out_png, bbox_inches="tight")
