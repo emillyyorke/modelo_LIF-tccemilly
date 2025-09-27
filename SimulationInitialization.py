@@ -54,7 +54,6 @@ def make_synapses(G):
             name='synapses_stdp'
         )
     else:
-        # Sem STDP: sinapse mínima, apenas transmite
         S = Synapses(
             G, G,
             model='w:1',
@@ -63,7 +62,6 @@ def make_synapses(G):
             name='synapses_static'
         )
 
-    # Conexões: completo sem autapses
     if AUTAPSES:
         S.connect(p=P_CONNECT)
     else:
@@ -71,15 +69,17 @@ def make_synapses(G):
 
     S.delay = DELAY
 
-    # Pesos iniciais
     if STDP_ENABLED:
-        np.random.seed(7)
-        S.w = np.random.uniform(W_INIT_MIN, W_INIT_MAX, size=S.N)
+        # ==========================================================
+        # MUDANÇA FINAL: Usando a inicialização interna do Brian2
+        # ==========================================================
+        # A expressão 'rand()' do Brian2 gera um número aleatório diferente para cada sinapse.
+        S.w = 'rand() * (W_INIT_MAX - W_INIT_MIN) + W_INIT_MIN'
+        # ==========================================================
     else:
         S.w = W_INIT_FIXED
 
     return S
-
 
 def make_monitors(G, S):
     spk = SpikeMonitor(G, name='spikemon')
