@@ -2,7 +2,7 @@
 from brian2 import *
 import numpy as np
 import os
-import time  # O módulo 'time' já está sendo importado
+import time 
 
 from SimulationParameters import *
 from SimulationInitialization import (
