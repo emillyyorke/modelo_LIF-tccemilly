@@ -43,23 +43,23 @@ I_std  = 50*pA            # desvio para heterogeneidade
 # ===========================
 # STDP (Bi & Poo, aditivo)
 # ===========================
-STDP_ENABLED = False      # <--- comute aqui
+STDP_ENABLED = True     # <--- comute aqui
 
 # Janelas temporais
 tau_pre  = 20*ms
 tau_post = 20*ms
 
-# Magnitudes (aqui mantenho LTD ligeiramente mais forte p/ evitar saturação)
-A_LTP = 0.04          # Δw por pós-antes
-A_LTD = -0.02        # Δw por antes-pós
-eta   = 1.0               # fator global
+# Magnitudes 
+A_LTP = 0.005      # Δw por pós-antes
+A_LTD = -0.006     # Δw por antes-pós
+eta   = 1.0        # fator global
 
 # Limites e inicialização
 W_MIN = 0.0
 W_MAX = 2.0
 W_INIT_FIXED = 1.0        # sem STDP
-W_INIT_MIN   = 0.5        # com STDP: uniforme [0.5, 1.5]
-W_INIT_MAX   = 1.5
+W_INIT_MIN   = 0.2        # com STDP
+W_INIT_MAX   = 0.8
 
 # ===========================
 # Monitoramento
