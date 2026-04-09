@@ -1,0 +1,58 @@
+# ========================================
+# .gitignore — Projeto LIF TCC
+# ========================================
+
+# Ambiente virtual
+venv/
+env/
+.venv/
+ENV/
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Resultados de simulações (arquivos pesados)
+results/
+results_*/
+*.npy
+*.pkl
+
+# Mas mantém os arquivos .npy de exemplo se existirem dentro de uma pasta examples/
+!examples/*.npy
+
+# Saídas de plots
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.svg
+# Mas mantém imagens de documentação na pasta docs/
+!docs/**/*.png
+!docs/**/*.pdf
+
+# Arquivos auto-gerados pelos exports
+*_Spikes.py
+*_np.txt
+weights_t_*.npy
+stdp_weight_log.json
+episodios_tabela.csv
+episodios_tabela.txt
+
+# Brian2 — código gerado
+brian_extensions/
+output/
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
