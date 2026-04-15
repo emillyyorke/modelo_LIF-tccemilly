@@ -257,7 +257,7 @@ def main():
     ax_raster.set_ylabel("Neurônio")
     ax_raster.set_xlabel("Tempo (s)")
     if t_max_s > VIEW_MAX_S:
-        ax_raster.set_title(f"Raster de Spikes (primeiros {VIEW_MAX_S:.0f} s)")
+        ax_raster.set_title(f"Raster de Spikes")
     else:
         ax_raster.set_title("Raster de Spikes")
     ax_raster.grid(alpha=0.15, linestyle=":")
