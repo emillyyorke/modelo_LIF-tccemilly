@@ -193,6 +193,14 @@ def main():
     print(f"\n[INFO] Tempo total de execução: {duration:.2f} segundos.")
     print(f"[OK] Arquivos salvos em: {os.path.abspath(results_dir)}")
 
+    # ---- Gerar relatório de métricas automaticamente ----
+    try:
+        from relatorio_metricas import gerar_relatorio
+        print("\n[INFO] Gerando relatorio de metricas...")
+        gerar_relatorio(results_dir, verbose=False)
+    except Exception as e:
+        print(f"[AVISO] Nao foi possivel gerar relatorio de metricas: {e}")
+
     print("\nPROXIMOS PASSOS:")
     print(f"1. Painel resumo (raster+correlações): python plot_summary.py --dir \"{results_dir}\"")
     print(f"2. Exporte dados para o raster plot com: python export_for_plot.py --root \"{results_dir}\" --base N_TESTE")
