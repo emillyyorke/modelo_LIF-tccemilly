@@ -253,7 +253,10 @@ def main():
     ax_raster.invert_yaxis()
     ax_raster.set_ylabel("Neuronio")
     ax_raster.set_xlabel("Tempo (s)")
-    ax_raster.set_title("Raster de spikes")
+    if t_max_s > VIEW_MAX_S:
+        ax_raster.set_title(f"Raster de Spikes (primeiros {VIEW_MAX_S:.0f} s)")
+    else:
+        ax_raster.set_title("Raster de Spikes")
     ax_raster.grid(alpha=0.15, linestyle=":")
     add_panel_label(ax_raster, "A")
 
@@ -355,3 +358,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

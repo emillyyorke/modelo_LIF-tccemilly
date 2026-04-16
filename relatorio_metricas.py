@@ -188,4 +188,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--dir", required=True, help="Pasta de resultados")
     args = parser.parse_args()
+<<<<<<< HEAD
     gerar_relatorio(args.dir)
+=======
+    gerar_relatorio(args.dir)
+>>>>>>> bb80eddfa7289cfb01f8f99a230a20146f99d5c7
+
