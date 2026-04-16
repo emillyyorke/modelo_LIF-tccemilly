@@ -15,7 +15,10 @@ def make_iapp():
     - 'depression': I_i ∈ [0.15, 1.15] × rheobase  → [30, 230] pA
     - 'adaptation': I_i ∈ [0.5,  1.5 ] × rheobase  → [100, 300] pA
     """
-    np.random.seed(42)
+    if FEEDBACK_MODE == 'adaptation':
+        np.random.seed(45)  # seed calibrada: R_prec≈0.86, R_foll≈0.04
+    else:
+        np.random.seed(42)  # seed original da depressão — não alterar
 
     if FEEDBACK_MODE == 'adaptation':
         # Distribuição uniforme estilo Tabak (Table 1, col. adaptation)

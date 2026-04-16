@@ -119,8 +119,8 @@ tau_post = 20*ms
 #
 # Simétrico  (A_LTP = -A_LTD): peso médio estável em ~1.0
 # Assimétrico: LTP > |LTD| → fortalecimento gradual
-A_LTP =  0.0005          # Δw por par causal (pré-antes-pós)
-A_LTD = -0.0005          # Δw por par anti-causal (pós-antes-pré)
+A_LTP =  0.0006          # Δw por par causal (pré-antes-pós)
+A_LTD = -0.0004         # Δw por par anti-causal (pós-antes-pré)
 eta   =  1.0             # fator global
 
 # Limites e inicialização

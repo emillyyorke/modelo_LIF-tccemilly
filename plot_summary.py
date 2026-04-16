@@ -2,13 +2,16 @@
 """
 plot_summary.py
 ===============
-Painel resumo da simulação — 4 quadros em uma única figura:
-  Top-left:     Raster plot de spikes
-  Top-right:    Atividade da rede (taxa de disparo suavizada)
-  Bottom-left:  Correlação duração vs intervalo PRECEDENTE
-  Bottom-right: Correlação duração vs intervalo SEGUINTE
+Painel resumo da simulacao em layout 2x2 otimizado para inclusao em TCC/tese:
+  Painel A (sup. esq.):  Raster plot de spikes
+  Painel B (sup. dir.):  Atividade da rede (taxa de disparo suavizada)
+  Painel C (inf. esq.):  Correlacao duracao vs intervalo PRECEDENTE
+  Painel D (inf. dir.):  Correlacao duracao vs intervalo SEGUINTE
 
-Lê diretamente dos .npy (não precisa de export_for_plot).
+Le diretamente dos .npy (nao precisa de export_for_plot).
+
+A figura segue o padrao da Fig. 2 de Tabak et al. (2010), com rotulos A/B/C/D
+em cada painel para facilitar a descricao no texto.
 
 Uso:
   python plot_summary.py --dir ./results/DEPRESSION_STDP_OFF_...
@@ -111,18 +114,6 @@ def get_params(rdir):
     return params
 
 
-def build_title(params):
-    mode = params.get("FEEDBACK_MODE", "?")
-    stdp = params.get("STDP_ENABLED", "False")
-
-    if stdp == "True":
-        ltp = params.get("A_LTP", "?")
-        ltd = params.get("A_LTD", "?")
-        return f"{mode.upper()} | STDP ON (LTP={ltp}, LTD={ltd})"
-    else:
-        return f"{mode.upper()} | STDP OFF"
-
-
 # ============================================================
 # Detectar picos de atividade (para linhas verticais)
 # ============================================================
@@ -148,23 +139,31 @@ def find_peaks_simple(y, dt_ms, prominence=0.10, min_dist_ms=400):
 
 
 # ============================================================
+# Adicionar rótulo A/B/C/D no canto superior esquerdo do painel
+# ============================================================
+def add_panel_label(ax, label, dx=-0.12, dy=1.08):
+    ax.text(dx, dy, label, transform=ax.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='left')
+
+
+# ============================================================
 # Main
 # ============================================================
 def main():
     parser = argparse.ArgumentParser(
-        description="Painel resumo: raster + atividade + correlações")
+        description="Painel resumo 2x2: raster + atividade + correlacoes")
     parser.add_argument("--dir", required=True,
-                        help="Pasta de resultados da simulação")
+                        help="Pasta de resultados da simulacao")
     parser.add_argument("--thr", type=float, default=0.15,
-                        help="Limiar fracional para detecção de episódios")
+                        help="Limiar fracional para deteccao de episodios")
     parser.add_argument("--skip-first", type=int, default=1,
-                        help="Quantos episódios iniciais descartar das estatísticas "
-                             "(transientes de inicialização). Padrão: 1. Use 0 "
+                        help="Quantos episodios iniciais descartar das estatisticas "
+                             "(transientes de inicializacao). Padrao: 1. Use 0 "
                              "para incluir todos.")
     args = parser.parse_args()
 
     rdir = args.dir
-    assert os.path.isdir(rdir), f"Diretório não encontrado: {rdir}"
+    assert os.path.isdir(rdir), f"Diretorio nao encontrado: {rdir}"
 
     # ---- Carregar dados ----
     spike_i = np.load(os.path.join(rdir, "spike_i.npy"))
@@ -173,7 +172,6 @@ def main():
     rate_hz = np.load(os.path.join(rdir, "rate_hz.npy"))    # Hz
 
     params = get_params(rdir)
-    title_str = build_title(params)
 
     # ---- Normalizar atividade para [0, 1] ----
     a_min, a_max = rate_hz.min(), rate_hz.max()
@@ -189,14 +187,14 @@ def main():
     # ---- Separar: visualização usa TODOS, estatísticas descartam os primeiros N ----
     skip_n = max(0, int(args.skip_first))
     if skip_n >= len(episodes):
-        print(f"[AVISO] skip_first={skip_n} >= episódios detectados ({len(episodes)}). "
-              f"Mantendo todos para estatísticas.")
+        print(f"[AVISO] skip_first={skip_n} >= episodios detectados ({len(episodes)}). "
+              f"Mantendo todos para estatisticas.")
         skip_n = 0
     episodes_stats = episodes[skip_n:]
     corr_data = compute_intervals(episodes_stats)
 
-    print(f"[INFO] Episódios detectados: {len(episodes)} "
-          f"(usando {len(episodes_stats)} para estatísticas, "
+    print(f"[INFO] Episodios detectados: {len(episodes)} "
+          f"(usando {len(episodes_stats)} para estatisticas, "
           f"descartando {skip_n} inicial(is))")
 
     # ---- Picos para linhas verticais ----
@@ -208,41 +206,40 @@ def main():
     t_max_s  = t_max_ms / 1000.0
 
     # ---- Limite visual da janela temporal (raster + atividade) ----
-    # Não afeta as estatísticas: TODOS os episódios continuam contribuindo para R.
+    # Nao afeta as estatisticas: TODOS os episodios continuam contribuindo para R.
     VIEW_MAX_S = 40.0
     view_end_s = min(t_max_s, VIEW_MAX_S)
     view_end_ms = view_end_s * 1000.0
 
     # ============================================================
-    # FIGURA — 4×1: raster / atividade / corr_prec / corr_seg (vertical)
+    # FIGURA — Layout 2x2 otimizado para TCC/tese
     # ============================================================
     plt.rcParams.update({
         "figure.dpi": 120,
         "savefig.dpi": 300,
-        "font.size": 10,
-        "axes.titlesize": 11,
-        "axes.labelsize": 10,
-        "xtick.labelsize": 9,
-        "ytick.labelsize": 9,
+        "font.size": 11,
+        "axes.titlesize": 12,
+        "axes.labelsize": 11,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
         "axes.spines.top": False,
         "axes.spines.right": False,
     })
 
-    fig = plt.figure(figsize=(10, 18))
+    # Layout 2x2: largura maior que altura, adequado para paginas retrato
+    fig = plt.figure(figsize=(12, 9))
     gs = fig.add_gridspec(
-        4, 1,
-        height_ratios=[1.2, 1.2, 1, 1],
-        hspace=0.35,
+        2, 2,
+        hspace=0.45,
+        wspace=0.28,
         left=0.08, right=0.97,
-        top=0.96, bottom=0.04,
+        top=0.93, bottom=0.08,
     )
 
-    fig.suptitle(title_str, fontsize=13, y=0.985)
-
     # ──────────────────────────────────────
-    # 1º: Raster plot (até VIEW_MAX_S)
+    # PAINEL A (superior esquerdo): Raster plot
     # ──────────────────────────────────────
-    ax_raster = fig.add_subplot(gs[0])
+    ax_raster = fig.add_subplot(gs[0, 0])
     spk_mask = spike_t <= view_end_ms
     ax_raster.scatter(spike_t[spk_mask] / 1000.0, spike_i[spk_mask],
                       s=1.5, marker='.', c='red', alpha=0.7,
@@ -254,18 +251,16 @@ def main():
     ax_raster.set_xlim([0, view_end_s])
     ax_raster.set_ylim([-1, n_neurons])
     ax_raster.invert_yaxis()
-    ax_raster.set_ylabel("Neurônio")
+    ax_raster.set_ylabel("Neuronio")
     ax_raster.set_xlabel("Tempo (s)")
-    if t_max_s > VIEW_MAX_S:
-        ax_raster.set_title(f"Raster de Spikes (primeiros {VIEW_MAX_S:.0f} s)")
-    else:
-        ax_raster.set_title("Raster de Spikes")
+    ax_raster.set_title("Raster de spikes")
     ax_raster.grid(alpha=0.15, linestyle=":")
+    add_panel_label(ax_raster, "A")
 
     # ──────────────────────────────────────
-    # 2º: Atividade da rede (até VIEW_MAX_S)
+    # PAINEL B (superior direito): Atividade da rede
     # ──────────────────────────────────────
-    ax_act = fig.add_subplot(gs[1])
+    ax_act = fig.add_subplot(gs[0, 1])
     rate_mask = rate_t <= view_end_ms
     ax_act.plot(rate_t[rate_mask] / 1000.0, a_norm[rate_mask],
                 lw=0.9, color='black')
@@ -273,9 +268,7 @@ def main():
         if tt <= view_end_ms:
             ax_act.axvline(tt / 1000.0, color='gray', lw=0.6, ls='--', alpha=0.4)
 
-    # Marcar episódios visíveis:
-    # cinza claro = descartados das estatísticas (transiente)
-    # azul = usados nas estatísticas
+    # Marcar episodios visiveis
     for i, ep in enumerate(episodes):
         if ep['onset_ms'] > view_end_ms:
             break
@@ -291,63 +284,71 @@ def main():
     ax_act.set_ylim([-0.02, 1.05])
     ax_act.set_ylabel("Atividade (normalizada)")
     ax_act.set_xlabel("Tempo (s)")
-    ax_act.set_title(f"Atividade da Rede ({len(episodes)} episódios detectados)")
+    ax_act.set_title(f"Atividade da rede  ({len(episodes)} episodios)")
     ax_act.grid(alpha=0.15, linestyle=":")
+    add_panel_label(ax_act, "B")
 
     # ──────────────────────────────────────
-    # 3º: Correlação PRECEDENTE
+    # PAINEL C (inferior esquerdo): Correlacao PRECEDENTE
     # ──────────────────────────────────────
-    ax_prec = fig.add_subplot(gs[2])
+    ax_prec = fig.add_subplot(gs[1, 0])
     if corr_data is not None and len(corr_data['dur_prec']) > 2:
         x = corr_data['preceding']
         y = corr_data['dur_prec']
         r_val, p_val = stats.pearsonr(x, y)
-        ax_prec.scatter(x, y, s=35, c='black', alpha=0.7, edgecolors='none')
+        ax_prec.scatter(x, y, s=30, c='black', alpha=0.7, edgecolors='none')
         z = np.polyfit(x, y, 1)
         xfit = np.linspace(x.min(), x.max(), 50)
         ax_prec.plot(xfit, np.polyval(z, xfit), 'r--', lw=1.5)
         ax_prec.set_title(
-            f'PRECEDENTE — R = {r_val:.2f}  (p = {p_val:.4f}, n = {len(x)})'
+            f'Precedente  —  R = {r_val:.2f}  (n = {len(x)})'
         )
     else:
-        ax_prec.set_title('PRECEDENTE — dados insuficientes')
-        ax_prec.text(0.5, 0.5, f'{len(episodes_stats)} episódios usados\n'
-                                f'(mín. 3 necessários)',
+        ax_prec.set_title('Precedente  —  dados insuficientes')
+        ax_prec.text(0.5, 0.5, f'{len(episodes_stats)} episodios usados\n'
+                                f'(min. 3 necessarios)',
                      transform=ax_prec.transAxes, ha='center', va='center',
                      fontsize=11, color='gray')
-    ax_prec.set_xlabel('Intervalo interepisódico precedente (ms)')
-    ax_prec.set_ylabel('Duração do episódio (ms)')
+    ax_prec.set_xlabel('Intervalo interepisodico precedente (ms)')
+    ax_prec.set_ylabel('Duracao do episodio (ms)')
     ax_prec.grid(alpha=0.2)
+    add_panel_label(ax_prec, "C")
 
     # ──────────────────────────────────────
-    # 4º: Correlação SEGUINTE
+    # PAINEL D (inferior direito): Correlacao SEGUINTE
     # ──────────────────────────────────────
-    ax_foll = fig.add_subplot(gs[3])
+    ax_foll = fig.add_subplot(gs[1, 1])
     if corr_data is not None and len(corr_data['dur_foll']) > 2:
         x = corr_data['following']
         y = corr_data['dur_foll']
         r_val, p_val = stats.pearsonr(x, y)
-        ax_foll.scatter(x, y, s=35, c='black', alpha=0.7, edgecolors='none')
+        ax_foll.scatter(x, y, s=30, c='black', alpha=0.7, edgecolors='none')
         z = np.polyfit(x, y, 1)
         xfit = np.linspace(x.min(), x.max(), 50)
         ax_foll.plot(xfit, np.polyval(z, xfit), 'r--', lw=1.5)
         ax_foll.set_title(
-            f'SEGUINTE — R = {r_val:.2f}  (p = {p_val:.4f}, n = {len(x)})'
+            f'Seguinte  —  R = {r_val:.2f}  (n = {len(x)})'
         )
     else:
-        ax_foll.set_title('SEGUINTE — dados insuficientes')
-        ax_foll.text(0.5, 0.5, f'{len(episodes_stats)} episódios usados\n'
-                                f'(mín. 3 necessários)',
+        ax_foll.set_title('Seguinte  —  dados insuficientes')
+        ax_foll.text(0.5, 0.5, f'{len(episodes_stats)} episodios usados\n'
+                                f'(min. 3 necessarios)',
                      transform=ax_foll.transAxes, ha='center', va='center',
                      fontsize=11, color='gray')
-    ax_foll.set_xlabel('Intervalo interepisódico seguinte (ms)')
-    ax_foll.set_ylabel('Duração do episódio (ms)')
+    ax_foll.set_xlabel('Intervalo interepisodico seguinte (ms)')
+    ax_foll.set_ylabel('Duracao do episodio (ms)')
     ax_foll.grid(alpha=0.2)
+    add_panel_label(ax_foll, "D")
 
-    # ---- Salvar (300 DPI) ----
+    # ---- Salvar (300 DPI, sem bbox_inches='tight' para manter dimensoes consistentes) ----
     out_path = os.path.join(rdir, "summary.png")
-    fig.savefig(out_path, dpi=300, bbox_inches='tight')
+    fig.savefig(out_path, dpi=300)
     print(f"[OK] Painel resumo salvo em: {out_path}")
+
+    # Salvar tambem em PDF vetorial (melhor para TCC)
+    out_path_pdf = os.path.join(rdir, "summary.pdf")
+    fig.savefig(out_path_pdf)
+    print(f"[OK] Versao PDF vetorial salva em: {out_path_pdf}")
 
     plt.show()
 
