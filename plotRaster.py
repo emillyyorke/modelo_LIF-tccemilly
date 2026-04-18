@@ -242,4 +242,3 @@ except Exception as e:
     print(f"[warn] Não foi possível salvar a figura: {e}")
 
 plt.show()
-

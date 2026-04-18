@@ -1,5 +1,6 @@
 # SimulationInitialization.py
 from brian2 import *
+import os
 import numpy as np
 from SimulationParameters import *
 from iappInit import make_iapp

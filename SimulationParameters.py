@@ -4,7 +4,7 @@ from brian2 import *
 # ===========================
 # Tempo de simulação
 # ===========================
-SIM_TIME = 40*second     # ~40 episódios para scatter plots
+SIM_TIME = 40*second
 DT       = 0.1*ms
 
 # ===========================
@@ -19,7 +19,7 @@ AUTAPSES = False          # sem autoconexões
 # ===========================
 # 'adaptation'  → corrente lenta de adaptação (ga, theta)
 # 'depression'  → depressão sináptica pré-sináptica (s_j), Tabak et al. 2010
-FEEDBACK_MODE = 'depression'  # <--- comute aqui
+FEEDBACK_MODE = 'adaptation'  # <--- comute aqui
 
 # ===========================
 # LIF — parâmetros comuns a ambos os modos
@@ -52,10 +52,9 @@ gbar_syn_adapt = 0.14*nS          # 14 nS / (N-1) ≈ 0.14 nS para N=100
 tau_e_adapt    = 10*ms            # decaimento sináptico
 V_theta        = -80*mV           # reversal da adaptação (K-like)
 tau_a          = 2500*ms          # decaimento da adaptação
-                                  # (Tabak normalizado dá 5000 ms, mas como meu
-                                  # modelo não tem saturação em θ_max, uso um
-                                  # valor menor para compensar a maior acumulação
-                                  # de ga durante episódios → IEI compatível)
+                                  # (Tabak original = 5000ms, mas sem saturação em θ_max
+                                  # o ga acumula mais → valor reduzido para IEI compatível
+                                  # com ~107 episódios em 480s)
 
 # Incremento de ga por spike — HETEROGÊNEO por neurônio
 # Faixa ampla é importante para criar variabilidade estocástica nos episódios

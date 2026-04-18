@@ -181,4 +181,3 @@ def apply_batch_stdp(S, spike_i, spike_t_ms, t_start_ms, t_end_ms):
         'n_ltp_pairs': n_ltp_total,
         'n_ltd_pairs': n_ltd_total
     }
-

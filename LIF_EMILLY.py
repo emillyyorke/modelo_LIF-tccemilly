@@ -201,6 +201,20 @@ def main():
     except Exception as e:
         print(f"[AVISO] Nao foi possivel gerar relatorio de metricas: {e}")
 
+    # ---- Gerar figura TCC (atividade + correlações) automaticamente ----
+    try:
+        from plot_summary_tcc import main_from_args as _tcc_plot
+
+        class _TccArgs:
+            dir        = results_dir
+            thr        = 0.15
+            skip_first = 1
+
+        print("\n[INFO] Gerando figura TCC (summary_tcc.png / summary_tcc.pdf)...")
+        _tcc_plot(_TccArgs())
+    except Exception as e:
+        print(f"[AVISO] Nao foi possivel gerar figura TCC: {e}")
+
     print("\nPROXIMOS PASSOS:")
     print(f"1. Painel resumo (raster+correlações): python plot_summary.py --dir \"{results_dir}\"")
     print(f"2. Exporte dados para o raster plot com: python export_for_plot.py --root \"{results_dir}\" --base N_TESTE")
@@ -213,4 +227,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
