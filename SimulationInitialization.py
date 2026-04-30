@@ -149,7 +149,8 @@ def make_synapses(G):
 
     # ---------- Inicialização dos pesos ----------
     if STDP_ENABLED:
-        S.w = 'rand() * (W_INIT_MAX - W_INIT_MIN) + W_INIT_MIN'
+        np.random.seed(99)
+        S.w = np.random.uniform(W_INIT_MIN, W_INIT_MAX, size=S.N)
     else:
         S.w = W_INIT_FIXED
 

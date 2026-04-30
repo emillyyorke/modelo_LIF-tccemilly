@@ -4,7 +4,7 @@ from brian2 import *
 # ===========================
 # Tempo de simulação
 # ===========================
-SIM_TIME = 40*second
+SIM_TIME = 240*second
 DT       = 0.1*ms
 
 # ===========================
@@ -19,7 +19,7 @@ AUTAPSES = False          # sem autoconexões
 # ===========================
 # 'adaptation'  → corrente lenta de adaptação (ga, theta)
 # 'depression'  → depressão sináptica pré-sináptica (s_j), Tabak et al. 2010
-FEEDBACK_MODE = 'adaptation'  # <--- comute aqui
+FEEDBACK_MODE = 'depression'  # <--- comute aqui
 
 # ===========================
 # LIF — parâmetros comuns a ambos os modos
@@ -101,7 +101,7 @@ else:
 # ===========================
 # STDP — Configuração
 # ===========================
-STDP_ENABLED = False       # <--- comute aqui
+STDP_ENABLED = True       # <--- comute aqui
 
 # Modo de STDP:
 #   'batch'        → STDP em lote (batch_stdp.py) — RECOMENDADO para redes episódicas
@@ -118,8 +118,8 @@ tau_post = 20*ms
 #
 # Simétrico  (A_LTP = -A_LTD): peso médio estável em ~1.0
 # Assimétrico: LTP > |LTD| → fortalecimento gradual
-A_LTP =  0.0006          # Δw por par causal (pré-antes-pós)
-A_LTD = -0.0004         # Δw por par anti-causal (pós-antes-pré)
+A_LTP =  0.009          # Δw por par causal (pré-antes-pós)
+A_LTD = -0.009         # Δw por par anti-causal (pós-antes-pré)
 eta   =  1.0             # fator global
 
 # Limites e inicialização

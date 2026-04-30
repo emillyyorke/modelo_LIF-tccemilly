@@ -177,7 +177,7 @@ def _run(args):
     ax_act.tick_params(length=4)
 
     # ── C — Correlação PRECEDENTE ───────────────────────────────
-    ax_prec.text(-0.13, 1.05, "C",
+    ax_prec.text(-0.13, 1.05, "B",
                  transform=ax_prec.transAxes,
                  fontsize=15, fontweight='bold',
                  va='bottom', ha='left')
@@ -195,7 +195,7 @@ def _run(args):
     ax_prec.tick_params(length=4)
 
     # ── D — Correlação SEGUINTE ─────────────────────────────────
-    ax_foll.text(-0.13, 1.05, "D",
+    ax_foll.text(-0.13, 1.05, "C",
                  transform=ax_foll.transAxes,
                  fontsize=15, fontweight='bold',
                  va='bottom', ha='left')

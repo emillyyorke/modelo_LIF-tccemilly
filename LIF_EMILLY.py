@@ -63,6 +63,11 @@ def main():
     # ---- Criar componentes ----
     G = make_neurons()
     S = make_synapses(G)
+
+    # Salvar g_theta_inc para reproducibilidade futura (adaptação)
+    if FEEDBACK_MODE == 'adaptation':
+        np.save(os.path.join(results_dir, "gtheta_inc.npy"),
+                np.array(G.g_theta_inc))
     spk, rate, wmon, slow_mon = make_monitors(G, S)
 
     print(f"[INFO] FEEDBACK_MODE = {FEEDBACK_MODE} | STDP = {STDP_ENABLED} "
@@ -227,3 +232,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
