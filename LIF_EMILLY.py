@@ -206,6 +206,58 @@ def main():
     except Exception as e:
         print(f"[AVISO] Nao foi possivel gerar relatorio de metricas: {e}")
 
+    # ---- Calcular e salvar T_LEPIS (tempo do último episódio) ----
+    try:
+        from relatorio_metricas import _detectar_episodios as _det_ep
+        _rate_hz_tlepis = np.load(os.path.join(results_dir, "rate_hz.npy"))
+        _sim_time_s = float(np.load(os.path.join(results_dir, "rate_t.npy"))[-1]) / 1000.0
+        _episodes = _det_ep(_rate_hz_tlepis, dt_ms=1.0)
+
+        if _episodes:
+            # T_LEPIS = onset do último episódio detectado
+            _last_ep  = _episodes[-1]
+            _tlepis_ms = float(_last_ep['onset_ms'])
+            _tlepis_s  = _tlepis_ms / 1000.0
+            _n_ep = len(_episodes)
+        else:
+            # Nenhum episódio detectado → T_LEPIS = 0
+            _tlepis_ms = 0.0
+            _tlepis_s  = 0.0
+            _n_ep = 0
+
+        _tlepis_lines = [
+            "# Tempo do último episódio detectado na simulação.",
+            "# T_LEPIS = onset do último episódio (ms / s).",
+            "# Se N_EPISODES = 0, nenhum episódio foi detectado.",
+            f"T_LEPIS_MS       = {_tlepis_ms:.3f}",
+            f"T_LEPIS_S        = {_tlepis_s:.6f}",
+            f"N_EPISODES       = {_n_ep}",
+            f"SIM_TIME_S       = {_sim_time_s:.3f}",
+        ]
+        if _episodes:
+            _tlepis_lines += [
+                f"LAST_EP_ONSET_MS  = {_last_ep['onset_ms']:.3f}",
+                f"LAST_EP_OFFSET_MS = {_last_ep['offset_ms']:.3f}",
+                f"LAST_EP_DUR_MS    = {_last_ep['duration_ms']:.3f}",
+            ]
+
+        _tlepis_path = os.path.join(results_dir, "tlepis.txt")
+        with open(_tlepis_path, "w") as _f:
+            _f.write("\n".join(_tlepis_lines) + "\n")
+        print(f"[INFO] T_LEPIS = {_tlepis_s:.2f} s  (episodio {_n_ep}/{_n_ep})  "
+              f"→ salvo em tlepis.txt")
+    except Exception as e:
+        print(f"[AVISO] Nao foi possivel calcular T_LEPIS: {e}")
+
+    # ---- Gerar snapshots de distribuição de pesos (0%, 25%, 50%, 100%) ----
+    if STDP_ENABLED:
+        try:
+            from plot_weight_snapshots import run_weight_snapshots
+            print("\n[INFO] Gerando snapshots de distribuicao de pesos (0/25/50/100%)...")
+            run_weight_snapshots(results_dir)
+        except Exception as e:
+            print(f"[AVISO] Nao foi possivel gerar snapshots de pesos: {e}")
+
     # ---- Gerar figura TCC (atividade + correlações) automaticamente ----
     try:
         from plot_summary_tcc import main_from_args as _tcc_plot
@@ -224,12 +276,13 @@ def main():
     print(f"1. Painel resumo (raster+correlações): python plot_summary.py --dir \"{results_dir}\"")
     print(f"2. Exporte dados para o raster plot com: python export_for_plot.py --root \"{results_dir}\" --base N_TESTE")
     print(f"3. Gere o raster plot com: python plotRaster.py --dir \"{results_dir}\"")
-    print(f"4. Gere os plots de distribuição de pesos com: python plot_weight_evolution.py --dir \"{results_dir}\"")
+    print(f"4. Distribuição completa de pesos: python plot_weight_evolution.py --dir \"{results_dir}\"")
+    print(f"5. [NOVO] Snapshots 0/25/50/100%: python plot_weight_snapshots.py --dir \"{results_dir}\"")
+    print(f"6. [NOVO] Gráfico T_LEPIS: python plot_tlepis_comparison.py --root \"./results\"")
 
     if FEEDBACK_MODE in ('depression', 'adaptation'):
-        print(f"4. Análise Tabak (auto-detecta modo): python plot_tabak_analysis.py --dir \"{results_dir}\"")
+        print(f"7. Análise Tabak (auto-detecta modo): python plot_tabak_analysis.py --dir \"{results_dir}\"")
 
 
 if __name__ == "__main__":
     main()
-    

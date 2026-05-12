@@ -189,3 +189,4 @@ if __name__ == "__main__":
     parser.add_argument("--dir", required=True, help="Pasta de resultados")
     args = parser.parse_args()
     gerar_relatorio(args.dir)
+    
