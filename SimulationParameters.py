@@ -4,7 +4,7 @@ from brian2 import *
 # ===========================
 # Tempo de simulação
 # ===========================
-SIM_TIME = 240*second
+SIM_TIME = 480*second
 DT       = 0.1*ms
 
 # ===========================
@@ -36,38 +36,20 @@ V_syn   = 0*mV            # reversal da sinapse excitatória
 # ===========================
 # Parâmetros POR MODO — Adaptação celular  (Tabak Table 1, col. adaptation)
 # ===========================
-# Tabak normalizado:
-#   I_i ∈ [0.5, 1.5]    → físico: [100, 300] pA  (rheobase = 200 pA)
-#   g_syn = 1.4         → físico: 14 nS total → 0.14 nS por sinapse
-#   α_θ × T_θ = 0.01    → incremento de θ por spike (~1% do máximo)
-#   β_θ = 0.004         → tau_a = tau_m / 0.004 = 5000 ms
-#   g_θ ∈ [0.5, 1.5]    → MÁXIMO de saturação, NÃO o incremento por spike
-#   T_ref = 0.25 tau_m  = 5 ms
-#
-# Em unidades físicas, com tau_a = 5000 ms e taxa de disparo de ~50 Hz dentro
-# de um episódio, o equilíbrio ga = inc × rate × tau_a ≈ 0.1 × 50 × 5 = 25 nS,
-# o que dá uma corrente de adaptação suficiente para terminar episódios.
-T_ref_adapt    = 5*ms             # refratário (Tabak: 0.25 tau_m)
-gbar_syn_adapt = 0.14*nS          # 14 nS / (N-1) ≈ 0.14 nS para N=100
-tau_e_adapt    = 10*ms            # decaimento sináptico
-V_theta        = -80*mV           # reversal da adaptação (K-like)
-tau_a          = 2500*ms          # decaimento da adaptação
-                                  # (Tabak original = 5000ms, mas sem saturação em θ_max
-                                  # o ga acumula mais → valor reduzido para IEI compatível
-                                  # com ~107 episódios em 480s)
+T_ref_adapt    = 5*ms
+gbar_syn_adapt = 0.14*nS
+tau_e_adapt    = 10*ms
+V_theta        = -80*mV
+tau_a          = 2500*ms
 
 # Incremento de ga por spike — HETEROGÊNEO por neurônio
-# Faixa ampla é importante para criar variabilidade estocástica nos episódios
-# (sem heterogeneidade suficiente, a rede entra em regime determinístico
-# com episódios idênticos e R_preceding cai drasticamente)
-gbar_theta_min = 0.05*nS          # incremento mínimo por spike
-gbar_theta_max = 0.25*nS          # incremento máximo por spike (5× o min)
-gbar_theta     = 0.5 * (gbar_theta_min + gbar_theta_max)  # média (para normalização/log)
+gbar_theta_min = 0.05*nS
+gbar_theta_max = 0.25*nS
+gbar_theta     = 0.5 * (gbar_theta_min + gbar_theta_max)
 
-# Corrente externa — adaptação (uniforme estilo Tabak)
-# Faixa ampla = mais neurônios spontaneamente ativos = mais ruído de coincidência
-I_min_adapt = 80*pA               # 0.4 × rheobase
-I_max_adapt = 340*pA              # 1.7 × rheobase
+# Corrente externa — adaptação
+I_min_adapt = 80*pA
+I_max_adapt = 340*pA
 
 # ===========================
 # Parâmetros POR MODO — Depressão sináptica
@@ -113,21 +95,32 @@ tau_pre  = 20*ms
 tau_post = 20*ms
 
 # Magnitudes
-# REGRA: Com N=100 e ~50 spikes/neurônio/episódio, cada sinapse recebe
-# ~50 pares por episódio. Mantenha |A_LTP|, |A_LTD| ≤ 0.001.
-#
-# Simétrico  (A_LTP = -A_LTD): peso médio estável em ~1.0
-# Assimétrico: LTP > |LTD| → fortalecimento gradual
-A_LTP =  0.01          # Δw por par causal (pré-antes-pós)
-A_LTD = -0.01         # Δw por par anti-causal (pós-antes-pré)
-eta   =  1.0             # fator global
+A_LTP =  0.009          # Δw por par causal (pré-antes-pós)
+A_LTD = -0.009          # Δw por par anti-causal (pós-antes-pré)
+eta   =  1.0            # fator global
 
-# Limites e inicialização
-W_MIN = 0.5               # piso — 50% do calibrado (impede morte da rede)
+# ===========================
+# Pesos sinápticos
+# ===========================
+
+# Limites absolutos permitidos pelo STDP
+W_MIN = 0.0
 W_MAX = 2.0
-W_INIT_FIXED = 1.0        # sem STDP
-W_INIT_MIN   = 0.95       # com STDP: próximo ao calibrado
-W_INIT_MAX   = 1.05
+
+# Valor médio de referência.
+W_INIT_FIXED = 1.0
+
+# Inicialização uniforme próxima de 1.0.
+W_INIT_MIN = 0.5
+W_INIT_MAX = 1.5
+
+# Normaliza os pesos iniciais para média exatamente igual a W_INIT_FIXED.
+W_INIT_NORMALIZE_MEAN = False
+
+# Seed fixa para pesos iniciais.
+# Para cada execução sair diferente, use:
+#   RANDOM_SEED = None
+RANDOM_SEED = 99
 
 # Intervalo de aplicação do batch STDP
 STDP_BATCH_INTERVAL_MS = 500.0

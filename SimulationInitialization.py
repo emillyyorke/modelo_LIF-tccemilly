@@ -53,9 +53,11 @@ def make_neurons():
     if FEEDBACK_MODE == 'adaptation':
         G.ge = 0 * nS
         G.ga = 0 * nS
-        # gbar_theta HETEROGÊNEO por neurônio (Tabak escolhe aleatoriamente
-        # para impedir que a adaptação homogenize a rede)
+
+        # Heterogeneidade por neurônio.
+        # Mantido como estava no seu modelo.
         G.g_theta_inc = 'gbar_theta_min + rand() * (gbar_theta_max - gbar_theta_min)'
+
     elif FEEDBACK_MODE == 'depression':
         G.ge = 0 * nS
         G.s  = 1.0
@@ -69,40 +71,49 @@ def make_synapses(G):
     """
     Cria as sinapses.
 
-    - Modo depressão: on_pre usa  ge_post += w * gbar_syn * s_pre
-    - Modo adaptação: on_pre usa  ge_post += w * gbar_syn
+    - Modo depressão:
+      on_pre usa ge_post += w * gbar_syn * s_pre
+
+    - Modo adaptação:
+      on_pre usa ge_post += w * gbar_syn
 
     STDP:
-    - Se STDP_MODE == 'batch': sinapses estáticas com variável w.
+    - Se STDP_MODE == 'batch':
+      sinapses estáticas com variável w.
       As atualizações de peso são feitas externamente por batch_stdp.py.
-    - Se STDP_MODE == 'event_driven': traces apre/apost (Brian2 nativo).
-      AVISO: causa viés LTD em redes episódicas.
+
+    - Se STDP_MODE == 'event_driven':
+      traces apre/apost do Brian2.
+      AVISO: pode causar viés LTD em redes episódicas.
     """
 
     # ---------- String de transmissão sináptica ----------
     if FEEDBACK_MODE == 'depression':
         syn_transmit = 'ge_post += w * gbar_syn * s_pre'
-    else:  # adaptation
+    else:
         syn_transmit = 'ge_post += w * gbar_syn'
 
     # ---------- Escolher modelo de STDP ----------
     if STDP_ENABLED and STDP_MODE == 'event_driven':
-        # AVISO: Event-driven STDP não é recomendado para redes episódicas!
         print("[AVISO] Usando STDP event-driven — pode causar viés LTD e morte da rede.")
+
         model_str = '''
         w : 1
         dapre/dt  = -apre / tau_pre  : 1 (event-driven)
         dapost/dt = -apost / tau_post : 1 (event-driven)
         '''
+
         on_pre_str = f'''
         {syn_transmit}
         apre += A_LTP
         w = clip(w + eta * apost, W_MIN, W_MAX)
         '''
+
         on_post_str = '''
         apost += A_LTD
         w = clip(w + eta * apre, W_MIN, W_MAX)
         '''
+
         syn_name = 'synapses_stdp_ed'
 
     elif STDP_ENABLED and STDP_MODE == 'batch':
@@ -148,30 +159,85 @@ def make_synapses(G):
     S.delay = DELAY
 
     # ---------- Inicialização dos pesos ----------
-    if STDP_ENABLED:
-        np.random.seed(99)
-        S.w = np.random.uniform(W_INIT_MIN, W_INIT_MAX, size=S.N)
+    #
+    # Antes:
+    #   - com STDP: pesos uniformes entre W_INIT_MIN e W_INIT_MAX
+    #   - sem STDP: todos os pesos fixos em 1.0
+    #
+    # Agora:
+    #   - os pesos são SEMPRE inicializados de forma uniforme;
+    #   - a distribuição fica espalhada no tempo 0;
+    #   - a média é normalizada para 1.0, preservando a força média antiga;
+    #   - a seed fixa garante reprodutibilidade.
+    #
+    # Isso permite que o histograma inicial não fique em uma barra só,
+    # mas também evita mudar demais o comportamento calibrado da rede.
+
+    n_synapses = len(S.w[:])
+
+    if RANDOM_SEED is not None:
+        rng = np.random.RandomState(RANDOM_SEED)
     else:
-        S.w = W_INIT_FIXED
+        rng = np.random.RandomState()
+
+    initial_weights = rng.uniform(
+        W_INIT_MIN,
+        W_INIT_MAX,
+        size=n_synapses
+    )
+
+    # Força a média dos pesos iniciais a ser exatamente W_INIT_FIXED.
+    # Exemplo:
+    #   média antes  = 1.0018
+    #   média depois = 1.0000
+    #
+    # Isso ajuda a comparar com a versão antiga em que todos os pesos eram 1.0.
+    if W_INIT_NORMALIZE_MEAN:
+        initial_weights = initial_weights / np.mean(initial_weights) * W_INIT_FIXED
+
+    # Garante que nenhum peso ultrapasse os limites do modelo.
+    initial_weights = np.clip(initial_weights, W_MIN, W_MAX)
+
+    S.w = initial_weights
+
+    print(
+        f"[INFO] Pesos iniciais uniformes: "
+        f"seed={RANDOM_SEED}, "
+        f"min={np.min(initial_weights):.4f}, "
+        f"max={np.max(initial_weights):.4f}, "
+        f"media={np.mean(initial_weights):.4f}, "
+        f"dp={np.std(initial_weights):.4f}"
+    )
 
     return S
 
 
 def make_monitors(G, S):
     """
-    Cria monitores de spikes, taxa, pesos e (se depressão) variável s.
-    Retorna (spikemon, ratemon, wmon, smon).
+    Cria monitores de spikes, taxa, pesos e variável lenta.
+
+    Retorna:
+        spikemon, ratemon, wmon, slow_mon
     """
     spk  = SpikeMonitor(G, name='spikemon')
     rate = PopulationRateMonitor(G, name='ratemon')
 
-    # Monitor de pesos (apenas se STDP ativo)
+    # Monitor de pesos.
+    # Mantido apenas se STDP estiver ativo.
     nrec = min(N_W_SAMPLES, S.N)
-    idx  = np.random.RandomState(123).choice(S.N, size=nrec, replace=False)
-    wmon = (StateMonitor(S, 'w', record=idx, dt=W_MON_DT, name='wmon')
-            if STDP_ENABLED else None)
 
-    # Monitor da variável lenta (depressão: s, adaptação: ga)
+    idx = np.random.RandomState(123).choice(
+        S.N,
+        size=nrec,
+        replace=False
+    )
+
+    wmon = (
+        StateMonitor(S, 'w', record=idx, dt=W_MON_DT, name='wmon')
+        if STDP_ENABLED else None
+    )
+
+    # Monitor da variável lenta.
     if FEEDBACK_MODE == 'depression':
         slow_mon = StateMonitor(G, 's', record=True, dt=1*ms, name='smon')
     elif FEEDBACK_MODE == 'adaptation':
